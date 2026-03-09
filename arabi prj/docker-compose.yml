@@ -1,0 +1,55 @@
+services:
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smartrecruit-php
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html
+      - ./storage:/var/www/html/storage
+      - ./data:/var/www/html/data
+    environment:
+      - DB_HOST=mysql
+      - DB_NAME=smartrecruit
+      - DB_USER=smartrecruit
+      - DB_PASS=smartrecruit_secret
+      - APP_ENV=development
+      - CSV_DATASET_PATH=/var/www/html/dataset_cvs_5000.csv
+    depends_on:
+      mysql:
+        condition: service_healthy
+    # Permet au conteneur d'atteindre Ollama sur l'hôte (CV_LLM_API_URL=http://host.docker.internal:11434/v1)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - smartrecruit-net
+
+  mysql:
+    image: mysql:8.0
+    container_name: smartrecruit-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secret
+      MYSQL_DATABASE: smartrecruit
+      MYSQL_USER: smartrecruit
+      MYSQL_PASSWORD: smartrecruit_secret
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secret"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - smartrecruit-net
+
+volumes:
+  mysql_data:
+
+networks:
+  smartrecruit-net:
+    driver: bridge

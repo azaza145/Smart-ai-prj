@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RecruteIA — Plateforme Intelligente de Recrutement</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="/css/recruteia.css" rel="stylesheet">
+<style>
+.five-col{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;}
+.prog-bar{height:6px;background:var(--border);border-radius:4px;overflow:hidden;}
+.prog-fill{height:100%;border-radius:4px;transition:width .6s ease;}
+.track{padding:20px 22px;}
+.track-step{display:flex;gap:14px;padding-bottom:20px;position:relative;}
+.track-step::after{content:'';position:absolute;left:14px;top:30px;bottom:0;width:2px;background:var(--border);}
+.track-step:last-child::after{display:none;}
+.track-step:last-child{padding-bottom:0;}
+.track-step.t-done::after{background:var(--ca);}
+.tdot{width:30px;height:30px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--white);flex-shrink:0;z-index:1;}
+.track-step.t-done .tdot{border-color:var(--ca);background:var(--ca);color:#fff;font-size:11px;}
+.track-step.t-curr .tdot{border-color:var(--am);background:var(--am-l);font-size:13px;}
+.tl{font-size:13px;font-weight:600;padding-top:4px;}
+.ts{font-size:11px;color:var(--muted);margin-top:1px;}
+.match-card{border:1.5px solid var(--border);border-radius:11px;padding:14px;cursor:pointer;transition:all .18s;margin-bottom:10px;}
+.match-card:last-child{margin-bottom:0;}
+.match-card:hover,.match-card.sel{border-color:var(--ca);transform:translateY(-1px);box-shadow:var(--shadow);}
+.mh{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;}
+.mt{font-size:13px;font-weight:600;}
+.ms{font-size:11px;color:var(--muted);margin-top:1px;}
+.mscore{font-family:var(--font-h);font-size:19px;font-weight:700;color:var(--ca);}
+.mb{height:4px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:8px;}
+.mf{height:100%;border-radius:4px;}
+.mtags{display:flex;flex-wrap:wrap;gap:5px;}
+.mtag{background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:11px;color:var(--muted);}
+.skills-wrap{display:flex;flex-wrap:wrap;gap:7px;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:9px 11px;min-height:44px;align-items:flex-start;cursor:text;}
+.skills-wrap:focus-within{border-color:var(--ca);background:var(--white);}
+.sk-tag{background:var(--ca-l);color:var(--ca);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;}
+.sk-tag .rm{cursor:pointer;opacity:.5;}
+.sk-input{border:none;background:transparent;outline:none;font-size:12px;font-family:var(--font-b);color:var(--text);min-width:90px;flex:1;}
+.lang-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;}
+.lang-item{border:1.5px solid var(--border);border-radius:7px;padding:9px 11px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:7px;font-size:12px;}
+.lang-item:hover{border-color:var(--ca);background:var(--ca-l);}
+.lang-item.sel{border-color:var(--ca);background:var(--ca-l);color:var(--ca);font-weight:600;}
+.upload-zone{border:2px dashed var(--border2);border-radius:11px;padding:28px 18px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--ca);background:var(--ca-l);}
+.upload-done{display:flex;align-items:center;gap:12px;background:var(--ca-l);border:1.5px solid var(--ca);border-radius:9px;padding:12px 16px;}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(28,26,23,.45);z-index:500;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--white);border-radius:16px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18);}
+.modal-header{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-family:var(--font-h);font-size:17px;font-weight:600;}
+.modal-close{width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:transparent;cursor:pointer;}
+.modal-body{padding:22px 24px;}
+.modal-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+.big-score{font-family:var(--font-h);font-size:44px;font-weight:700;line-height:1;}
+.score-ring-wrap{display:flex;flex-direction:column;align-items:center;padding:18px;background:var(--ca-l);border-radius:11px;margin-bottom:14px;}
+.sr-lbl{font-size:11px;color:var(--muted);margin-top:5px;}
+.score-row{display:flex;align-items:center;gap:8px;}
+.score-bar{flex:1;height:5px;background:var(--border);border-radius:4px;overflow:hidden;min-width:55px;}
+.score-fill{height:100%;border-radius:4px;}
+.score-v{font-family:var(--font-h);font-weight:700;font-size:13px;min-width:36px;}
+.abtns{display:flex;gap:4px;}
+.ibtn{width:27px;height:27px;border-radius:6px;border:1.5px solid var(--border);background:transparent;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;}
+.ibtn:hover{background:var(--bg);}
+.feed-item{display:flex;gap:12px;padding:12px 22px;border-bottom:1px solid var(--border);}
+.feed-item:last-child{border-bottom:none;}
+.fdot{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+.fm{font-size:13px;font-weight:500;}
+.ft{font-size:11px;color:var(--muted2);margin-top:2px;}
+.chart-area{padding:14px 22px 18px;display:flex;align-items:flex-end;gap:5px;height:140px;}
+.bc{display:flex;flex-direction:column;align-items:center;flex:1;gap:4px;}
+.bar{width:100%;border-radius:4px 4px 0 0;}
+.bl{font-size:9px;color:var(--muted);}
+.toggle{position:relative;width:36px;height:20px;display:inline-block;}
+.toggle input{opacity:0;width:0;height:0;}
+.slider{position:absolute;cursor:pointer;inset:0;background:var(--border2);border-radius:20px;transition:.3s;}
+.slider:before{position:absolute;content:"";height:14px;width:14px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s;}
+input:checked+.slider{background:var(--ad);}
+input:checked+.slider:before{transform:translateX(16px);}
+</style>
+</head>
+<body>
+
+<div class="role-bar">
+  <span>Vue :</span>
+  <button class="role-btn active-ca" onclick="switchRole('candidat')">Candidat</button>
+  <button class="role-btn" onclick="switchRole('recruteur')">Recruteur</button>
+  <button class="role-btn" onclick="switchRole('admin')">Admin</button>
+</div>
+
+<nav class="topnav" id="topnav">
+  <a href="/" class="logo">Recrute<span class="logo-dot">IA</span>
+    <span class="role-badge" id="role-badge" style="background:var(--ca);">Candidat</span>
+  </a>
+  <div class="nav-links" id="nav-links"></div>
+  <div class="nav-right">
+    <button class="btn btn-ghost" style="font-size:12px;padding:6px 13px;" onclick="showToast('Aide disponible')">Aide</button>
+    <a href="/forgot-password" class="btn btn-ghost" style="font-size:12px;padding:6px 13px;">Mot de passe oublié</a>
+    <div class="avatar-sm" id="top-avatar" style="background:linear-gradient(135deg,var(--ca),#2d9b6a);" onclick="showToast('Mon profil')">SA</div>
+  </div>
+</nav>
+
+<div id="view-candidat" class="view active">
+  <div class="hero" style="--role-c:var(--ca);">
+    <div class="hero-inner">
+      <div class="hero-text">
+        <div class="hero-greeting" style="color:var(--ca);">Bienvenue, Sara</div>
+        <h1 class="hero-title" id="ca-hero-title">Complétez votre profil pour <em style="color:var(--ca);">maximiser</em> vos chances</h1>
+        <p class="hero-sub">Notre IA analyse votre profil et le compare aux postes disponibles.</p>
+      </div>
+      <div class="step-bar">
+        <div class="step-pill s-done"><div class="step-num">1</div>Compte créé</div>
+        <div class="step-pill s-active"><div class="step-num">2</div>Profil</div>
+        <div class="step-pill"><div class="step-num">3</div>CV</div>
+        <div class="step-pill"><div class="step-num">4</div>Candidature</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="subpage active" data-page="mon-profil"><div class="page">
+    <div class="two-col">
+      <div>
+        <div class="card anim">
+          <div class="card-body" style="padding:18px 22px;">
+            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:8px;">
+              <span>Profil complété à <strong id="prog-pct" style="color:var(--ca);">68%</strong></span>
+            </div>
+            <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:68%;background:linear-gradient(90deg,var(--ca),#52d490);"></div></div>
+          </div>
+        </div>
+        <div class="card anim">
+          <div class="card-header"><div class="card-title"><div class="ci" style="background:#eef2ff;">Informations</div></div></div>
+          <div class="card-body">
+            <div class="fg">
+              <div class="field"><label>Prénom</label><input id="c-prenom" type="text" value="Sara" oninput="updateProgress()"/></div>
+              <div class="field"><label>Nom</label><input id="c-nom" type="text" value="Amrani" oninput="updateProgress()"/></div>
+              <div class="field ff"><label>Email</label><input type="email" value="sara.amrani@mail.com"/></div>
+            </div>
+          </div>
+        </div>
+        <div class="card anim">
+          <div class="card-header"><div class="card-title">Compétences</div></div>
+          <div class="card-body">
+            <div class="skills-wrap" id="skills-wrap">
+              <div class="sk-tag">PHP<span class="rm" onclick="removeSkill(this)">×</span></div>
+              <div class="sk-tag">MySQL<span class="rm" onclick="removeSkill(this)">×</span></div>
+              <div class="sk-tag">React.js<span class="rm" onclick="removeSkill(this)">×</span></div>
+              <input class="sk-input" id="sk-input" placeholder="Ajouter…"/>
+            </div>
+            <div class="field" style="margin-top:12px;"><label>Langues</label>
+              <div class="lang-grid">
+                <div class="lang-item sel" onclick="this.classList.toggle('sel');updateProgress()">Arabe</div>
+                <div class="lang-item sel" onclick="this.classList.toggle('sel');updateProgress()">Français</div>
+                <div class="lang-item sel" onclick="this.classList.toggle('sel');updateProgress()">Anglais</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;padding:10px 0;">
+          <button class="btn btn-ca" onclick="submitApplication()">Soumettre ma candidature</button>
+        </div>
+      </div>
+      <div>
+        <div class="card anim">
+          <div class="card-header"><div class="card-title">Suivi de candidature</div></div>
+          <div class="track" id="track-steps">
+            <div class="track-step t-done"><div class="tdot">1</div><div><div class="tl">Compte créé</div><div class="ts">Il y a 3 jours</div></div></div>
+            <div class="track-step t-curr"><div class="tdot">2</div><div><div class="tl">Profil en cours</div><div class="ts">Complétez à 100%</div></div></div>
+            <div class="track-step"><div class="tdot">3</div><div><div class="tl">CV soumis</div><div class="ts">En attente</div></div></div>
+            <div class="track-step"><div class="tdot">4</div><div><div class="tl">Résultat</div><div class="ts">Shortlist ou refus</div></div></div>
+          </div>
+        </div>
+        <div class="card anim">
+          <div class="card-header"><div class="card-title">Postes correspondants</div></div>
+          <div class="card-body">
+            <div class="match-card sel">
+              <div class="mh"><div><div class="mt">Dev Full Stack</div><div class="ms">PHP, React, MySQL</div></div><div class="mscore">94%</div></div>
+              <div class="mb"><div class="mf" style="width:94%;background:linear-gradient(90deg,var(--ca),#52d490);"></div></div>
+            </div>
+            <button class="btn btn-outline-ca" style="width:100%;justify-content:center;margin-top:10px;" onclick="showToast('Voir tous les postes')">Voir tous les postes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="subpage" data-page="postes-disponibles">
+    <div class="hero"><div class="hero-inner"><div class="hero-text" style="padding-bottom:28px;">
+      <div class="hero-greeting" style="color:var(--ca);">Découvrez nos offres</div>
+      <h1 class="hero-title">Postes <em style="color:var(--ca);">disponibles</em></h1>
+    </div></div></div>
+    <div class="page"><div class="postes-grid" id="postes-grid"></div></div>
+  </div>
+
+  <div class="subpage" data-page="mes-candidatures">
+    <div class="hero"><div class="hero-inner"><div class="hero-text" style="padding-bottom:28px;">
+      <h1 class="hero-title">Mes <em style="color:var(--ca);">candidatures</em></h1>
+    </div></div></div>
+    <div class="page"><div id="my-applications"></div></div>
+  </div>
+
+  <div class="subpage" data-page="resultats-ia">
+    <div class="hero"><div class="hero-inner"><div class="hero-text" style="padding-bottom:28px;">
+      <h1 class="hero-title">Vos <em style="color:var(--ca);">résultats IA</em></h1>
+    </div></div></div>
+    <div class="page"><div class="card"><div class="card-body"><div id="ia-scores-list"></div></div></div></div>
+  </div>
+</div>
+
+<div id="view-recruteur" class="view">
+  <div class="hero"><div class="hero-inner"><div class="hero-text">
+    <div class="hero-greeting" style="color:var(--re);">Espace Recruteur</div>
+    <h1 class="hero-title">Trouvez le <em style="color:var(--re);">meilleur profil</em> grâce à l'IA</h1>
+  </div><div class="hero-right">
+    <div class="hstat" style="border-top-color:var(--re);"><div class="hstat-v" style="color:var(--re);">247</div><div class="hstat-l">Candidats</div></div>
+    <div class="hstat"><div class="hstat-v">8</div><div class="hstat-l">Postes actifs</div></div>
+  </div></div></div>
+  <div class="subpage active" data-page="recommandations-ia"><div class="page">
+    <div class="ai-banner anim">
+      <div><div class="ai-t">Module IA opérationnel</div><div class="ai-s">TF-IDF + Cosine Similarity</div></div>
+      <button class="btn btn-re" onclick="runAI()">Relancer l'analyse</button>
+    </div>
+    <div class="card"><div class="card-header"><div class="card-title">Classement des candidats</div></div>
+      <div class="poste-tabs"><div class="ptab active">Dev Full Stack <span class="cnt">68</span></div><div class="ptab">Data Analyst <span class="cnt">45</span></div></div>
+      <div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Candidat</th><th>Score IA</th><th>Statut</th></tr></thead><tbody id="cand-tbody"></tbody></table></div>
+    </div>
+    <div class="card" id="cand-detail-card"><div class="card-header"><div class="card-title">Profil candidat</div></div>
+      <div style="padding:20px 22px;" id="cand-detail-body">
+        <div class="score-ring-wrap"><div class="big-score" id="det-score" style="color:var(--ca);">94%</div><div class="sr-lbl">Score IA</div></div>
+        <div class="u-av" id="det-av" style="background:linear-gradient(135deg,#7c3aed,#3b82f6);width:48px;height:48px;font-size:18px;">SA</div>
+        <div id="det-name" style="font-family:var(--font-h);font-size:17px;font-weight:700;">Sara Amrani</div>
+        <div id="det-sub" style="font-size:12px;color:var(--muted);">Développeuse Full Stack</div>
+        <button class="btn btn-ca" style="width:100%;margin-top:12px;" onclick="toggleShortlist()">Ajouter à la shortlist</button>
+      </div>
+    </div>
+  </div></div>
+  <div class="subpage" data-page="postes"><div class="page"><div class="postes-grid" id="re-postes-grid"></div></div></div>
+  <div class="subpage" data-page="tous-les-candidats"><div class="page"><div class="card"><table class="tbl"><thead><tr><th>Candidat</th><th>Score</th><th>Statut</th></tr></thead><tbody id="all-cand-tbody"></tbody></table></div></div></div>
+  <div class="subpage" data-page="statistiques"><div class="page"><div class="stats-big"><div class="stat-big-card"><div class="stat-big-val" style="color:var(--re);">247</div><div class="stat-big-lbl">Candidats</div></div><div class="stat-big-card"><div class="stat-big-val" style="color:var(--ca);">32</div><div class="stat-big-lbl">Shortlist</div></div></div></div></div>
+</div>
+
+<div id="view-admin" class="view">
+  <div class="hero"><div class="hero-inner"><div class="hero-text">
+    <div class="hero-greeting" style="color:var(--ad);">Administration</div>
+    <h1 class="hero-title">Gérez la plateforme <em style="color:var(--ad);">RecruteIA</em></h1>
+  </div><div class="hero-right">
+    <div class="hstat" style="border-top-color:var(--ad);"><div class="hstat-v" style="color:var(--ad);">247</div><div class="hstat-l">Candidats</div></div>
+  </div></div></div>
+  <div class="subpage active" data-page="tableau-de-bord"><div class="page">
+    <div class="five-col anim" style="margin-bottom:20px;">
+      <div class="stat-card"><div class="si" style="background:var(--ca-l);">Candidats</div><div class="sv">247</div><div class="sl">Inscrits</div></div>
+      <div class="stat-card"><div class="si" style="background:var(--ad-l);">Recruteurs</div><div class="sv">6</div><div class="sl">Actifs</div></div>
+      <div class="stat-card"><div class="si" style="background:var(--am-l);">Postes</div><div class="sv">8</div><div class="sl">Ouverts</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card"><div class="card-header"><div class="card-title">Utilisateurs</div></div><div style="overflow-x:auto;"><table class="tbl" id="users-table"><thead><tr><th>Utilisateur</th><th>Rôle</th><th>Actions</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div>
+      <div class="card"><div class="card-header"><div class="card-title">Activité récente</div></div><div id="activity-feed"></div></div>
+    </div>
+  </div></div>
+  <div class="subpage" data-page="utilisateurs"><div class="page"><div class="card"><table class="tbl"><tbody id="users-tbody-full"></tbody></table></div></div></div>
+  <div class="subpage" data-page="parametres"><div class="page"><div class="card"><div class="card-header"><div class="card-title">Paramètres</div></div><div class="card-body"><p>Configuration de la plateforme.</p><a href="/forgot-password" class="btn btn-ghost">Lien réinitialisation mot de passe</a></div></div></div></div>
+</div>
+
+<div class="modal-overlay" id="modal-confirm"><div class="modal" style="max-width:400px;"><div class="modal-header"><div class="modal-title" id="modal-confirm-title">Confirmer</div><button class="modal-close" onclick="closeModal('modal-confirm')">×</button></div><div class="modal-body"><p id="modal-confirm-msg">Êtes-vous sûr ?</p></div><div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modal-confirm')">Annuler</button><button class="btn btn-danger" id="modal-confirm-btn">Supprimer</button></div></div></div>
+
+<div class="toast" id="toast"><span class="toast-icon" id="toast-icon"></span><span id="toast-msg">Action effectuée</span></div>
+
+<script>
+var candidates=[{id:1,init:'SA',color:'linear-gradient(135deg,#7c3aed,#3b82f6)',name:'Sara Amrani',email:'sara.amrani@mail.com',city:'Casablanca',score:94,skills:['PHP','React','MySQL'],status:'shortlist',exp:'Dev Full Stack · TechMaroc',form:'Master Info · ENSIAS 2022'},{id:2,init:'KM',color:'linear-gradient(135deg,#f59e0b,#ef4444)',name:'Karim Mansour',email:'k.mansour@mail.com',city:'Rabat',score:88,skills:['PHP','Laravel'],status:'shortlist',exp:'Dev Backend',form:'Licence 2021'},{id:3,init:'LB',color:'linear-gradient(135deg,#00c97a,#0891b2)',name:'Leila Benali',email:'l.benali@mail.com',city:'Marrakech',score:82,skills:['React','MySQL'],status:'encours',exp:'Dev Web',form:'Master 2023'}];
+var users=[{id:1,init:'MK',color:'linear-gradient(135deg,#7c3aed,#4f46e5)',name:'Mohamed Khoury',email:'m.khoury@recrute.ma',role:'Recruteur',date:'12 Jan 2024',status:'actif'},{id:2,init:'SA',color:'linear-gradient(135deg,#00c97a,#0891b2)',name:'Sara Amrani',email:'sara.amrani@mail.com',role:'Candidat',date:'18 Mar 2024',status:'actif'}];
+var activities=[{icon:'📄',bg:'var(--ca-l)',msg:'12 nouveaux CV importés',time:'Il y a 14 min'},{icon:'🧠',bg:'var(--ad-l)',msg:'Analyse IA relancée',time:'Il y a 2h'}];
+var postesData=[{id:1,icon:'💻',bg:'var(--re-l)',title:'Développeur Full Stack',type:'CDI',skills:['PHP','MySQL','React.js'],count:68,score:94},{id:2,icon:'📊',bg:'var(--am-l)',title:'Data Analyst',type:'Stage',skills:['Python','Pandas'],count:45,score:78},{id:3,icon:'🛠️',bg:'var(--ca-l)',title:'DevOps Engineer',type:'CDI',skills:['Docker','CI/CD'],count:31,score:61}];
+
+var currentRole='candidat';
+var roleConfig={candidat:{badge:'Candidat',bg:'var(--ca)',nav:['Mon Profil','Postes disponibles','Mes candidatures','Résultats IA'],avatar:'SA',avatarBg:'linear-gradient(135deg,var(--ca),#2d9b6a)'},recruteur:{badge:'Recruteur',bg:'var(--re)',nav:['Recommandations IA','Postes','Tous les candidats','Statistiques'],avatar:'MK',avatarBg:'linear-gradient(135deg,var(--re),#1d4ed8)'},admin:{badge:'Admin',bg:'var(--ad)',nav:['Tableau de bord','Utilisateurs','Paramètres'],avatar:'AB',avatarBg:'linear-gradient(135deg,var(--ad),#4f46e5)'}};
+var roleColors={candidat:{color:'var(--ca)',light:'var(--ca-l)'},recruteur:{color:'var(--re)',light:'var(--re-l)'},admin:{color:'var(--ad)',light:'var(--ad-l)'}};
+
+function switchRole(role){
+  currentRole=role;
+  document.querySelectorAll('.role-btn').forEach(function(b,i){
+    b.className='role-btn';
+    if(['candidat','recruteur','admin'][i]===role) b.className='role-btn active-'+(role==='candidat'?'ca':role==='recruteur'?'re':'ad');
+  });
+  var cfg=roleConfig[role];
+  document.getElementById('role-badge').textContent=cfg.badge;
+  document.getElementById('role-badge').style.background=cfg.bg;
+  var nav=document.getElementById('nav-links');
+  var rc=roleColors[role];
+  nav.style.setProperty('--nav-color',rc.color);
+  nav.style.setProperty('--nav-light',rc.light);
+  nav.innerHTML=cfg.nav.map(function(n,i){return '<button class="nav-link'+(i===0?' active':'')+'" onclick="setNav(this,\''+n+'\')">'+n+'</button>';}).join('');
+  document.getElementById('top-avatar').textContent=cfg.avatar;
+  document.getElementById('top-avatar').style.background=cfg.avatarBg;
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+  document.getElementById('view-'+role).classList.add('active');
+  document.querySelectorAll('.subpage').forEach(function(s){s.classList.remove('active');});
+  var viewEl=document.getElementById('view-'+role);
+  viewEl.querySelectorAll('.subpage').forEach(function(s,i){if(i===0)s.classList.add('active');});
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function setNav(el,pageName){
+  document.querySelectorAll('.nav-link').forEach(function(n){n.classList.remove('active');});
+  el.classList.add('active');
+  var viewEl=document.getElementById('view-'+currentRole);
+  viewEl.querySelectorAll('.subpage').forEach(function(s){s.classList.remove('active');});
+  var slug=pageName.toLowerCase().replace(/\s+/g,'-').replace(/[éèê]/g,'e').replace(/[àâ]/g,'a').replace(/[ùû]/g,'u').replace(/[îï]/g,'i').replace(/[ôö]/g,'o').replace(/[ç]/g,'c').replace(/-+/g,'-').replace(/-$/,'');
+  var target=viewEl.querySelector('.subpage[data-page="'+slug+'"]');
+  if(target) target.classList.add('active');
+  else { var first=viewEl.querySelector('.subpage'); if(first) first.classList.add('active'); }
+}
+
+function updateProgress(){
+  var fields=[document.getElementById('c-prenom'),document.getElementById('c-nom')];
+  var filled=fields.filter(function(f){return f&&f.value.trim();}).length;
+  var skills=document.querySelectorAll('#skills-wrap .sk-tag').length;
+  var langs=document.querySelectorAll('.lang-item.sel').length;
+  var base=50+(filled/2)*10+Math.min(skills,5)*4+Math.min(langs,3)*2;
+  var pct=Math.min(100,Math.round(base));
+  document.getElementById('prog-pct').textContent=pct+'%';
+  document.getElementById('prog-fill').style.width=pct+'%';
+}
+
+function removeSkill(el){el.parentElement.remove();updateProgress();}
+document.getElementById('sk-input').addEventListener('keydown',function(e){
+  if((e.key==='Enter'||e.key===',')&&this.value.trim()){e.preventDefault();var t=document.createElement('div');t.className='sk-tag';t.innerHTML=this.value.trim()+' <span class="rm" onclick="removeSkill(this)">×</span>';document.getElementById('skills-wrap').insertBefore(t,this);this.value='';updateProgress();}
+});
+
+function submitApplication(){showToast('Candidature soumise !');document.querySelectorAll('#track-steps .track-step').forEach(function(s){s.classList.add('t-done');});document.getElementById('prog-fill').style.width='100%';document.getElementById('prog-pct').textContent='100%';}
+
+var selectedCandidateId=1;
+var shortlisted=new Set([1,2]);
+
+function renderCandidates(){
+  var tbody=document.getElementById('cand-tbody');
+  if(!tbody)return;
+  tbody.innerHTML=candidates.map(function(c){
+    var scoreColor=c.score>=85?'var(--ca)':c.score>=70?'var(--re)':'var(--muted)';
+    var statusTag=c.status==='shortlist'?'<span class="tag tg">Shortlist</span>':c.status==='encours'?'<span class="tag ta">En cours</span>':'<span class="tag tr">Refusé</span>';
+    return '<tr class="'+(c.id===selectedCandidateId?'sel':'')+'" onclick="selectCandidate('+c.id+')"><td><div class="u-info"><div class="u-av" style="background:'+c.color+';">'+c.init+'</div><div><div class="u-name">'+c.name+'</div><div class="u-sub">'+c.email+'</div></div></div></td><td><div class="score-row"><div class="score-bar"><div class="score-fill" style="width:'+c.score+'%;background:'+scoreColor+';"></div></div><div class="score-v" style="color:'+scoreColor+';">'+c.score+'%</div></div></td><td>'+statusTag+'</td></tr>';
+  }).join('');
+}
+
+function selectCandidate(id){
+  selectedCandidateId=id;
+  var c=candidates.find(function(x){return x.id===id;});
+  if(!c)return;
+  var detScore=document.getElementById('det-score');if(detScore)detScore.textContent=c.score+'%';
+  var detAv=document.getElementById('det-av');if(detAv){detAv.textContent=c.init;detAv.style.background=c.color;}
+  var detName=document.getElementById('det-name');if(detName)detName.textContent=c.name;
+  var detSub=document.getElementById('det-sub');if(detSub)detSub.textContent=c.exp.split('·')[0].trim()+' · '+c.city;
+  renderCandidates();
+}
+
+function toggleShortlist(){
+  var c=candidates.find(function(x){return x.id===selectedCandidateId;});if(!c)return;
+  if(shortlisted.has(selectedCandidateId)){shortlisted.delete(selectedCandidateId);c.status='encours';showToast('Retiré de la shortlist');}
+  else{shortlisted.add(selectedCandidateId);c.status='shortlist';showToast('Ajouté à la shortlist');}
+  selectCandidate(selectedCandidateId);
+}
+
+function runAI(){showToast('Analyse IA terminée');renderCandidates();}
+
+function renderUsers(){
+  var tbody=document.getElementById('users-tbody');if(!tbody)return;
+  tbody.innerHTML=users.map(function(u){
+    var roleTag=u.role==='Recruteur'?'<span class="tag tp">Recruteur</span>':'<span class="tag tb">Candidat</span>';
+    return '<tr><td><div class="u-info"><div class="u-av" style="background:'+u.color+';">'+u.init+'</div><div><div class="u-name">'+u.name+'</div><div class="u-sub">'+u.email+'</div></div></div></td><td>'+roleTag+'</td><td><div class="abtns"><div class="ibtn">✏️</div></div></td></tr>';
+  }).join('');
+}
+
+function renderPostesGrid(containerId,filter,typeFilter){
+  var el=document.getElementById(containerId);if(!el)return;
+  filter=filter||'';typeFilter=typeFilter||'';
+  var filtered=postesData.filter(function(p){var mt=!filter||p.title.toLowerCase().indexOf(filter.toLowerCase())>=0;var mty=!typeFilter||p.type===typeFilter;return mt&&mty;});
+  el.innerHTML=filtered.map(function(p){
+    return '<div class="poste-card"><div class="poste-card-head"><div class="poste-card-icon" style="background:'+p.bg+';">'+p.icon+'</div><div><div class="poste-card-title">'+p.title+'</div><div class="poste-card-sub">'+p.type+' · '+p.count+' candidatures</div></div><div style="font-family:var(--font-h);font-size:20px;font-weight:700;color:var(--ca);">'+p.score+'%</div></div><div class="poste-card-skills">'+p.skills.map(function(s){return '<span class="tag tm">'+s+'</span>';}).join('')+'</div></div>';
+  }).join('');
+}
+
+function renderMyApplications(){
+  var el=document.getElementById('my-applications');if(!el)return;
+  var applis=[{title:'Développeur Full Stack',date:'12 Mar 2024',status:'shortlist',score:94},{title:'Backend Developer',date:'8 Mar 2024',status:'encours',score:78}];
+  el.innerHTML=applis.map(function(a){
+    var tag=a.status==='shortlist'?'<span class="tag tg">Shortlist</span>':'<span class="tag ta">En cours</span>';
+    return '<div class="cand-appli-card"><div style="flex:1;"><div style="font-weight:600;font-size:14px;">'+a.title+'</div><div style="font-size:11px;color:var(--muted);">Postulé le '+a.date+'</div></div><div style="font-family:var(--font-h);font-size:18px;font-weight:700;color:var(--ca);">'+a.score+'%</div>'+tag+'</div>';
+  }).join('');
+}
+
+function renderIAScores(){
+  var el=document.getElementById('ia-scores-list');if(!el)return;
+  el.innerHTML=postesData.map(function(p){return '<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);"><span>'+p.icon+'</span><div style="flex:1;"><div style="font-size:13px;font-weight:600;">'+p.title+'</div><div class="prog-bar"><div class="prog-fill" style="width:'+p.score+'%;background:linear-gradient(90deg,var(--ca),#52d490);"></div></div></div><div style="font-family:var(--font-h);font-size:16px;font-weight:700;color:var(--ca);">'+p.score+'%</div></div>';}).join('');
+}
+
+function renderRePostes(){
+  var el=document.getElementById('re-postes-grid');if(!el)return;
+  el.innerHTML=postesData.map(function(p){return '<div class="poste-card"><div class="poste-card-head"><div class="poste-card-icon" style="background:'+p.bg+';">'+p.icon+'</div><div><div class="poste-card-title">'+p.title+'</div><div class="poste-card-sub">'+p.type+'</div></div><span class="tag tg">Actif</span></div><div class="poste-card-skills">'+p.skills.map(function(s){return '<span class="tag tb">'+s+'</span>';}).join('')+'</div><div class="poste-card-footer"><span>'+p.count+' candidatures</span><button class="btn btn-re" style="font-size:12px;">Voir candidats</button></div></div>';}).join('');
+}
+
+function renderAllCandidates(){
+  var el=document.getElementById('all-cand-tbody');if(!el)return;
+  el.innerHTML=candidates.map(function(c){
+    var st=c.status==='shortlist'?'<span class="tag tg">Shortlist</span>':c.status==='encours'?'<span class="tag ta">En cours</span>':'<span class="tag tr">Refusé</span>';
+    return '<tr onclick="selectCandidate('+c.id+')"><td><div class="u-info"><div class="u-av" style="background:'+c.color+';">'+c.init+'</div><div><div class="u-name">'+c.name+'</div></div></div></td><td>'+c.score+'%</td><td>'+st+'</td></tr>';
+  }).join('');
+}
+
+function renderUsersF(){
+  var el=document.getElementById('users-tbody-full');if(!el)return;
+  el.innerHTML=users.map(function(u){var rt=u.role==='Recruteur'?'<span class="tag tp">Recruteur</span>':'<span class="tag tb">Candidat</span>';return '<tr><td><div class="u-info"><div class="u-av" style="background:'+u.color+';">'+u.init+'</div><div><div class="u-name">'+u.name+'</div><div class="u-sub">'+u.email+'</div></div></div></td><td>'+rt+'</td><td>'+u.date+'</td></tr>';}).join('');
+}
+
+function renderActivity(){
+  var el=document.getElementById('activity-feed');if(!el)return;
+  el.innerHTML=activities.map(function(a){return '<div class="feed-item"><div class="fdot" style="background:'+a.bg+';">'+a.icon+'</div><div><div class="fm">'+a.msg+'</div><div class="ft">'+a.time+'</div></div></div>';}).join('');
+}
+
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+var confirmCallback=null;
+function confirmDelete(title,msg,cb){document.getElementById('modal-confirm-title').textContent=title;document.getElementById('modal-confirm-msg').textContent=msg;confirmCallback=cb;openModal('modal-confirm');document.getElementById('modal-confirm-btn').onclick=function(){if(confirmCallback)confirmCallback();closeModal('modal-confirm');};}
+
+var toastTimer;
+function showToast(msg){
+  if(typeof msg==='object')msg=msg[1]||msg.msg||'OK';
+  clearTimeout(toastTimer);
+  var t=document.getElementById('toast');
+  document.getElementById('toast-icon').textContent='✓';
+  document.getElementById('toast-msg').textContent=msg;
+  t.classList.add('show');
+  toastTimer=setTimeout(function(){t.classList.remove('show');},2800);
+}
+
+switchRole('candidat');
+renderCandidates();
+renderUsers();
+renderPostesGrid('postes-grid');
+renderMyApplications();
+renderIAScores();
+renderRePostes();
+renderAllCandidates();
+renderUsersF();
+renderActivity();
+</script>
+</body>
+</html>
