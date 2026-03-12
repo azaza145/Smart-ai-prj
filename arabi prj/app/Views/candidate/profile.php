@@ -22,6 +22,32 @@ if (!empty($c['experiences_json'])) {
     $decoded = json_decode($c['experiences_json'], true);
     if (is_array($decoded)) $experiencesList = $decoded;
 }
+// Use canonical profile for formations/experiences (auto-filled from CV)
+$canonicalProfile = $candidate ? \App\Models\Candidate::getProfile($candidate['id']) : [];
+$education = $canonicalProfile['education'] ?? [];
+$experience = $canonicalProfile['experience'] ?? [];
+$formationsDisplay = $c['formations_raw'] ?? '';
+if ($formationsDisplay === '' && !empty($education)) {
+    $lines = [];
+    foreach ($education as $ed) {
+        $deg = trim($ed['degree'] ?? '');
+        $school = trim($ed['school'] ?? '');
+        $year = trim($ed['year'] ?? '');
+        $lines[] = trim("$deg – $school $year");
+    }
+    $formationsDisplay = implode("\n", $lines);
+}
+$experiencesDisplay = $c['experiences_raw'] ?? '';
+if ($experiencesDisplay === '' && !empty($experience)) {
+    $lines = [];
+    foreach ($experience as $e) {
+        $title = trim($e['title'] ?? '');
+        $company = trim($e['company'] ?? '');
+        $dur = trim($e['duration'] ?? '');
+        $lines[] = trim("$title – $company $dur");
+    }
+    $experiencesDisplay = implode("\n", $lines);
+}
 $documents = $documents ?? [];
 $suggestedJobs = $suggestedJobs ?? [];
 $appliedJobIds = $appliedJobIds ?? [];
@@ -140,7 +166,7 @@ $appliedJobIds = $appliedJobIds ?? [];
             <div class="card-title"><div class="ci" style="background:var(--ca-l);">🎓</div>Formations</div>
         </div>
         <div class="card-body">
-            <textarea name="formations_raw" rows="4" style="width:100%;background:var(--bg);border:1.5px solid var(--border-2);border-radius:var(--r-sm);padding:10px 12px;font-family:var(--font-b);font-size:13px;color:var(--text);outline:none;resize:vertical;" placeholder="Ex : Master Informatique — ENSIAS 2018-2020&#10;Licence Maths — Université Hassan II 2015-2018"><?= htmlspecialchars($c['formations_raw'] ?? '') ?></textarea>
+            <textarea name="formations_raw" rows="4" style="width:100%;background:var(--bg);border:1.5px solid var(--border-2);border-radius:var(--r-sm);padding:10px 12px;font-family:var(--font-b);font-size:13px;color:var(--text);outline:none;resize:vertical;" placeholder="Ex : Master Informatique — ENSIAS 2018-2020&#10;Licence Maths — Université Hassan II 2015-2018"><?= htmlspecialchars($formationsDisplay ?? '') ?></textarea>
         </div>
     </div>
 
@@ -150,44 +176,66 @@ $appliedJobIds = $appliedJobIds ?? [];
             <div class="card-title"><div class="ci" style="background:var(--ca-l);">💼</div>Expériences professionnelles</div>
         </div>
         <div class="card-body">
-            <textarea name="experiences_raw" rows="4" style="width:100%;background:var(--bg);border:1.5px solid var(--border-2);border-radius:var(--r-sm);padding:10px 12px;font-family:var(--font-b);font-size:13px;color:var(--text);outline:none;resize:vertical;" placeholder="Ex : Développeur Senior — OCP 2020-2024&#10;Stage — Maroc Telecom Été 2019"><?= htmlspecialchars($c['experiences_raw'] ?? '') ?></textarea>
+            <textarea name="experiences_raw" rows="4" style="width:100%;background:var(--bg);border:1.5px solid var(--border-2);border-radius:var(--r-sm);padding:10px 12px;font-family:var(--font-b);font-size:13px;color:var(--text);outline:none;resize:vertical;" placeholder="Ex : Développeur Senior — OCP 2020-2024&#10;Stage — Maroc Telecom Été 2019"><?= htmlspecialchars($experiencesDisplay ?? '') ?></textarea>
         </div>
     </div>
+</form>
 
-    <!-- CV Upload -->
+    <!-- CV PDF : formulaire d'upload séparé pour que l'upload envoie bien vers /candidate/upload-cv (pas le formulaire profil) -->
     <div class="card" style="margin-bottom:16px;">
         <div class="card-header">
             <div class="card-title"><div class="ci" style="background:var(--ca-l);">📎</div>CV PDF</div>
         </div>
-        <div class="card-body">
-            <?php if (!empty($documents)): ?>
-            <?php foreach ($documents as $doc): ?>
-            <div class="upload-done" style="margin-bottom:12px;">
-                <span>📄</span>
-                <div style="flex:1;">
-                    <div style="font-weight:600;font-size:13px;"><?= htmlspecialchars($doc['original_name'] ?? 'CV.pdf') ?></div>
-                    <div style="font-size:11px;color:var(--muted);">Déposé le <?= date('d/m/Y', strtotime($doc['uploaded_at'] ?? 'now')) ?></div>
-                </div>
+        <div class="card-body cv-upload-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
+            <div>
+                <form id="upload-cv-form" method="post" action="/candidate/upload-cv" enctype="multipart/form-data">
+                    <?= \App\Core\Csrf::field() ?>
+                    <div class="upload-zone" onclick="document.getElementById('cv-file').click()" style="cursor:pointer;">
+                        <div style="font-size:24px;margin-bottom:8px;">⬆</div>
+                        <div style="font-size:13px;font-weight:600;color:var(--text);">Déposer un CV PDF</div>
+                        <div style="font-size:12px;color:var(--muted);margin-top:4px;">L'IA extraira automatiquement vos informations (formation, expériences, compétences)</div>
+                    </div>
+                    <input type="file" id="cv-file" name="cv" accept=".pdf" style="display:none;">
+                </form>
+                <script>
+                (function(){
+                    var el = document.getElementById('cv-file');
+                    if (el) el.addEventListener('change', function() {
+                        if (this.files && this.files.length) document.getElementById('upload-cv-form').submit();
+                    });
+                })();
+                </script>
             </div>
-            <?php endforeach; ?>
-            <?php endif; ?>
-            <form method="post" action="/candidate/upload-cv" enctype="multipart/form-data" style="margin-top:12px;">
-                <?= \App\Core\Csrf::field() ?>
-                <div class="upload-zone" onclick="document.getElementById('cv-file').click()">
-                    <div style="font-size:24px;margin-bottom:8px;">⬆</div>
-                    <div style="font-size:13px;font-weight:600;color:var(--text);">Déposer un CV PDF</div>
-                    <div style="font-size:12px;color:var(--muted);margin-top:4px;">L'IA extraira automatiquement vos informations</div>
+            <div>
+                <?php if (!empty($cvs)): ?>
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px;">CV déposé(s)</div>
+                <?php foreach ($cvs as $cv): ?>
+                <div class="upload-done" style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg);border-radius:var(--r-sm);border:1px solid var(--border);margin-bottom:8px;">
+                    <span style="font-size:20px;">📄</span>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:600;font-size:13px;"><?= htmlspecialchars($cv['original_name'] ?? 'CV.pdf') ?></div>
+                        <div style="font-size:11px;color:var(--muted);">Déposé le <?= date('d/m/Y H:i', strtotime($cv['uploaded_at'] ?? 'now')) ?></div>
+                    </div>
+                    <div style="display:flex;gap:6px;">
+                        <a href="/candidate/profile/cv/<?= (int)$cv['id'] ?>" class="btn btn-outline-ca btn-sm" target="_blank" rel="noopener">Voir</a>
+                        <form method="post" action="/candidate/profile/cv/<?= (int)$cv['id'] ?>/delete" style="display:inline;" onsubmit="return confirm('Supprimer ce CV ?');">
+                            <?= \App\Core\Csrf::field() ?>
+                            <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger, #c62828);" title="Supprimer">🗑️ Supprimer</button>
+                        </form>
+                    </div>
                 </div>
-                <input type="file" id="cv-file" name="cv" accept=".pdf" style="display:none;" onchange="this.form.submit()">
-            </form>
+                <?php endforeach; ?>
+                <?php else: ?>
+                <div style="font-size:12px;color:var(--muted);padding:12px;text-align:center;">Aucun CV déposé</div>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
 
-    <div style="display:flex;gap:10px;margin-top:4px;">
-        <button type="submit" class="btn btn-ca" style="flex:1;justify-content:center;">Enregistrer le profil</button>
-        <a href="/candidate/profile/generate-cv" class="btn btn-outline-ca">📄 Générer CV PDF</a>
-    </div>
-</form>
+<div style="display:flex;gap:10px;margin-top:4px;width:100%;">
+    <button type="submit" form="profile-form" class="btn btn-ca" style="flex:1;justify-content:center;">Enregistrer le profil</button>
+    <a href="/candidate/profile/generate-cv" class="btn btn-outline-ca">📄 Générer CV PDF</a>
+</div>
 
 </div>
 
@@ -295,6 +343,7 @@ $appliedJobIds = $appliedJobIds ?? [];
 </div>
 </div>
 
+<style>@media(max-width:700px){.cv-upload-grid{grid-template-columns:1fr!important;}}</style>
 <script>
 function removeSkill(skill) {
     const input = document.getElementById('skills-input');

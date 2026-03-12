@@ -29,6 +29,10 @@ class CandidateProfileSchema
         'implémentation', 'implementation', 'plateforme', 'gestion', 'événements', 'evenements',
         '—', '-', 'et', 'de', 'du', 'la', 'le', 'les', 'en', 'au', 'aux', 'par', 'pour',
         'formationlicence', 'formation licence',
+        'développement', 'developpement', 'programmation', 'réseaux', 'reseaux',
+        'sécurité', 'securite', 'systèmes', 'systemes', 'supervision', 'virtualisation',
+        'bases de données', 'bases de donnees', 'soft skills', 'soft', 'résolution', 'resolution',
+        'organisation', 'communication', 'full-stack', 'full stack', 'boot',
     ];
 
     /** Education degree/school values that are section headers — drop entry. */
@@ -69,7 +73,7 @@ class CandidateProfileSchema
      * Keep only a valid email (avoid "email@domain.comLinkedin" or similar concatenations).
      * Extracts first email-like substring, then validates with filter_var before returning.
      */
-    private static function cleanEmail(string $raw): string
+    public static function cleanEmail(string $raw): string
     {
         $raw = trim($raw);
         if ($raw === '') {
@@ -90,6 +94,29 @@ class CandidateProfileSchema
             return '';
         }
         return trim($m[0]);
+    }
+
+    /** Extract a single clear year or range from jumbled date strings (e.g. "20232021-202320212024" → "2021-2024"). */
+    public static function sanitizeEducationYear(string $raw): string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return '';
+        }
+        if (preg_match('/^(19|20)\d{2}$/u', $raw)) {
+            return $raw;
+        }
+        if (preg_match('/^(19|20)\d{2}\s*[–\-]\s*(19|20)\d{2}$/u', $raw)) {
+            return preg_replace('/\s+/', ' ', $raw);
+        }
+        if (!preg_match_all('/\b(19\d{2}|20\d{2})\b/u', $raw, $m)) {
+            return $raw;
+        }
+        $years = array_map('intval', array_unique($m[1]));
+        sort($years);
+        $min = (int) min($years);
+        $max = (int) max($years);
+        return $min === $max ? (string) $min : $min . '-' . $max;
     }
 
     /**
@@ -489,7 +516,8 @@ class CandidateProfileSchema
             ];
         }
         // Drop experience entries that are empty, only noise, or actually education (titre = diplôme/formation)
-        $out['experience'] = array_values(array_filter($out['experience'], static function (array $e) use ($degreeLikeTitles) {
+        $sectionTitleNoise = ['professionnelle', 'professionnel'];
+        $out['experience'] = array_values(array_filter($out['experience'], static function (array $e) use ($degreeLikeTitles, $sectionTitleNoise) {
             $t = $e['title'] ?? '';
             $c = $e['company'] ?? '';
             $d = $e['description'] ?? '';
@@ -504,15 +532,22 @@ class CandidateProfileSchema
                     return false;
                 }
             }
+            if (in_array($tLower, $sectionTitleNoise, true)) {
+                return false;
+            }
+            if (preg_match('/^(exp[eé]rience|professional(le)?|emploi|formation)(\s|$)/iu', $t)) {
+                return false;
+            }
             return true;
         }));
 
         $out['education'] = isset($out['education']) && is_array($out['education']) ? $out['education'] : [];
         foreach ($out['education'] as $i => $ed) {
+            $yearRaw = trim((string) ($ed['year'] ?? ''));
             $out['education'][$i] = [
                 'degree' => trim((string) ($ed['degree'] ?? '')),
                 'school' => trim((string) ($ed['school'] ?? '')),
-                'year' => trim((string) ($ed['year'] ?? '')),
+                'year' => self::sanitizeEducationYear($yearRaw),
                 'details' => trim((string) ($ed['details'] ?? '')),
             ];
         }
@@ -558,6 +593,10 @@ class CandidateProfileSchema
             $seenLower[$lower] = true;
             return true;
         }));
+        // Drop skill fragments (too short or pure digits)
+        $out['skills'] = array_values(array_filter($out['skills'], static fn ($s) =>
+            mb_strlen($s) >= 2 && !preg_match('/^\d+$/', $s)
+        ));
         $out['languages'] = isset($out['languages']) && is_array($out['languages']) ? array_values(array_filter(array_map('trim', $out['languages']))) : [];
         $out['projects'] = isset($out['projects']) && is_array($out['projects']) ? array_values(array_filter(array_map('trim', $out['projects']))) : [];
         $out['certifications'] = isset($out['certifications']) && is_array($out['certifications']) ? array_values(array_filter(array_map('trim', $out['certifications']))) : [];

@@ -121,7 +121,7 @@ class CvExtractionService
             'education' => self::normalizeEducationList($data['education'] ?? []),
             'experience' => self::normalizeExperienceList($data['experience'] ?? []),
             'skills' => self::normalizeStringList($data['skills'] ?? []),
-            'languages' => self::normalizeStringList($data['languages'] ?? []),
+            'languages' => self::normalizeLanguageList($data['languages'] ?? []),
             'projects' => self::normalizeStringList($data['projects'] ?? []),
             'certifications' => self::normalizeStringList($data['certifications'] ?? []),
             'hobbies' => self::normalizeStringList($data['hobbies'] ?? []),
@@ -165,14 +165,40 @@ class CvExtractionService
             if (!is_array($e)) {
                 continue;
             }
+            $yearRaw = trim((string) ($e['year'] ?? ''));
             $out[] = [
                 'degree' => trim((string) ($e['degree'] ?? '')),
                 'school' => trim((string) ($e['school'] ?? '')),
-                'year' => trim((string) ($e['year'] ?? '')),
+                'year' => self::sanitizeEducationYear($yearRaw),
                 'details' => trim((string) ($e['details'] ?? '')),
             ];
         }
         return $out;
+    }
+
+    /** Extract a single clear year or range from jumbled date strings (e.g. "20232021-202320212024-202527" → "2021-2023"). */
+    private static function sanitizeEducationYear(string $raw): string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return '';
+        }
+        // Already looks like a single year or a clean range
+        if (preg_match('/^(19|20)\d{2}$/u', $raw)) {
+            return $raw;
+        }
+        if (preg_match('/^(19|20)\d{2}\s*[–\-]\s*(19|20)\d{2}$/u', $raw)) {
+            return preg_replace('/\s+/', ' ', $raw);
+        }
+        // Extract all 4-digit years (19xx, 20xx)
+        if (!preg_match_all('/\b(19\d{2}|20\d{2})\b/u', $raw, $m)) {
+            return $raw;
+        }
+        $years = array_map('intval', array_unique($m[1]));
+        sort($years);
+        $min = (int) min($years);
+        $max = (int) max($years);
+        return $min === $max ? (string) $min : $min . '-' . $max;
     }
 
     private static function normalizeExperienceList($list): array
@@ -185,13 +211,61 @@ class CvExtractionService
             if (!is_array($e)) {
                 continue;
             }
+            $title = trim((string) ($e['title'] ?? ''));
+            $company = trim((string) ($e['company'] ?? ''));
+            $duration = trim((string) ($e['duration'] ?? ''));
+            $desc = trim((string) ($e['description'] ?? ''));
+
+            // Skip if title is a section header or single word "professionnelle/professionnel"
+            if (preg_match('/^(exp[eé]rience|professional(le)?|emploi|formation|langues?|comp[eé]tence|loisirs?)(\s|$)/iu', $title)) {
+                continue;
+            }
+            if (preg_match('/^professionnelle$/iu', $title) || preg_match('/^professionnel$/iu', $title)) {
+                continue;
+            }
+            // Deduplicate repeated sentences in description
+            if ($desc !== '') {
+                $sentences = preg_split('/(?<=[.!?\n])\s+/u', $desc);
+                $sentences = array_values(array_unique(array_filter(array_map('trim', $sentences))));
+                $desc = implode(' ', array_slice($sentences, 0, 5));
+            }
             $out[] = [
-                'title' => trim((string) ($e['title'] ?? '')),
-                'company' => trim((string) ($e['company'] ?? '')),
+                'title' => $title,
+                'company' => $company,
                 'location' => trim((string) ($e['location'] ?? '')),
-                'duration' => trim((string) ($e['duration'] ?? '')),
-                'description' => trim((string) ($e['description'] ?? '')),
+                'duration' => $duration,
+                'description' => $desc,
             ];
+        }
+        return $out;
+    }
+
+    private static function normalizeLanguageList($list): array
+    {
+        if (!is_array($list)) {
+            return [];
+        }
+        $levelWords = ['maternel', 'maternelle', 'courant', 'courante', 'bilingue',
+            'intermédiaire', 'intermediaire', 'débutant', 'debutant',
+            'native', 'fluent', 'intermediate', 'basic', 'advanced'];
+        $out = [];
+        $seen = [];
+        foreach ($list as $item) {
+            [$name, $level] = is_array($item)
+                ? [trim($item['name'] ?? ''), trim($item['level'] ?? '')]
+                : [trim((string) $item), ''];
+            if ($name === '' || mb_strlen($name) > 100) {
+                continue;
+            }
+            if (in_array(mb_strtolower($name), $levelWords, true)) {
+                continue;
+            }
+            $key = mb_strtolower($name);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $out[] = $level !== '' ? "{$name} ({$level})" : $name;
         }
         return $out;
     }

@@ -53,7 +53,7 @@ $recommendations_table_missing = $recommendations_table_missing ?? false;
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="field" style="min-width:100px;"><label>Score min (0–1)</label><input type="number" name="min_score" step="0.01" min="0" max="1" placeholder="0.5" value="<?= $filters['min_score'] !== null ? htmlspecialchars((string)$filters['min_score']) : '' ?>"></div>
+                <div class="field" style="min-width:100px;"><label>Score min (0–100)</label><input type="number" name="min_score" step="0.1" min="0" max="100" placeholder="50" value="<?= $filters['min_score'] !== null ? htmlspecialchars((string)$filters['min_score']) : '' ?>"></div>
                 <div class="field" style="min-width:90px;"><label>Exp. min</label><input type="number" name="experience_min" placeholder="—" value="<?= $filters['experience_min'] !== null ? (int)$filters['experience_min'] : '' ?>"></div>
                 <div class="field" style="min-width:90px;"><label>Exp. max</label><input type="number" name="experience_max" placeholder="—" value="<?= $filters['experience_max'] !== null ? (int)$filters['experience_max'] : '' ?>"></div>
                 <div class="field" style="align-self:flex-end;"><button type="submit" class="btn btn-re">Filtrer</button></div>
@@ -104,7 +104,8 @@ $recommendations_table_missing = $recommendations_table_missing ?? false;
                     $candidateId = (int)($r['candidate_id'] ?? 0);
                     $avatarColor = getUniqueAvatarColor($candidateId);
                     $avatarUrl = getAvatarUrl($candidateId, $name, $r['prenom'] ?? '');
-                    $scorePct = round((float)$r['score'] * 100);
+                    $displayScore = isset($r['score_pct']) ? round($r['score_pct'], 1) : round(($r['score'] ?? 0) * 100, 1);
+                    $scorePct = (int) $displayScore;
                     $rank = (int)($r['ranking'] ?? $r['rank'] ?? 0);
                     $scoreColor = $scorePct >= 85 ? 'var(--ca)' : ($scorePct >= 70 ? 'var(--re)' : 'var(--muted)');
                 ?>

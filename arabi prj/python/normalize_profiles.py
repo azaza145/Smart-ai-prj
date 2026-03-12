@@ -17,6 +17,20 @@ import mysql.connector
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import DB_CONFIG
 
+# Skill alias map: raw token -> canonical name
+SKILL_ALIASES = {
+    "js": "javascript", "ts": "typescript", "py": "python",
+    "reactjs": "react", "react.js": "react",
+    "node.js": "nodejs", "node": "nodejs",
+    "vuejs": "vue", "vue.js": "vue",
+    "ml": "machine learning", "ai": "artificial intelligence",
+    "dl": "deep learning", "nlp": "natural language processing",
+    "spring": "spring boot", "laravel": "php laravel",
+    "postgres": "postgresql", "mongo": "mongodb",
+    "k8s": "kubernetes", "tf": "tensorflow",
+    "sk": "scikit-learn", "sklearn": "scikit-learn",
+}
+
 
 def get_connection():
     return mysql.connector.connect(**DB_CONFIG)
@@ -45,9 +59,20 @@ def split_tokens(s, separators=None):
     return out
 
 
+def normalize_skill_token(token: str) -> str:
+    t = token.strip().lower()
+    return SKILL_ALIASES.get(t, t)
+
+
 def normalize_skills(raw):
     tokens = split_tokens(raw)
-    return tokens
+    result, seen = [], set()
+    for t in tokens:
+        canonical = normalize_skill_token(t)
+        if canonical and canonical not in seen and len(canonical) > 1:
+            seen.add(canonical)
+            result.append(canonical)
+    return result
 
 
 def normalize_languages(raw):

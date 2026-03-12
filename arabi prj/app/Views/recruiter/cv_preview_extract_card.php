@@ -16,7 +16,7 @@ $fullName = trim($profile['full_name'] ?? '') !== '' ? $profile['full_name'] : _
 $jobTitle = trim($profile['job_title'] ?? '') !== '' ? $profile['job_title'] : _cvDisp($profile['job_title'] ?? null);
 $summary = trim($profile['summary'] ?? '') !== '' ? $profile['summary'] : _cvDisp($profile['summary'] ?? null);
 $availability = trim($profile['availability'] ?? '') !== '' ? $profile['availability'] : _cvDisp($profile['availability'] ?? null);
-$email = trim($contact['email'] ?? '');
+$email = \App\Services\CandidateProfileSchema::cleanEmail(trim($contact['email'] ?? ''));
 $phone = trim($contact['phone'] ?? '');
 $address = trim($contact['address'] ?? '');
 $city = trim($contact['city'] ?? '');
@@ -274,17 +274,36 @@ $skillsCount = count($skills);
         <div class="cv-scard">
           <div class="cv-scard-header">🌐 <span class="fr-text">Langues</span><span class="en-text">Languages</span></div>
           <div class="cv-scard-body">
-            <?php if (count($languages) > 0) { foreach ($languages as $lang) {
-              $lang = trim($lang);
-              if ($lang === '') continue;
+            <?php foreach ($languages as $langRaw) {
+              $langRaw = trim($langRaw);
+              if ($langRaw === '') continue;
+              $langName = $langRaw;
+              $langLevel = '';
+              if (preg_match('/^(.+?)\s*\(([^)]+)\)\s*$/u', $langRaw, $lm)) {
+                $langName = trim($lm[1]);
+                $langLevel = trim($lm[2]);
+              }
+              $flagMap = ['arabe'=>'🇲🇦','arabic'=>'🇲🇦','français'=>'🇫🇷','francais'=>'🇫🇷',
+                'french'=>'🇫🇷','anglais'=>'🇬🇧','english'=>'🇬🇧','espagnol'=>'🇪🇸','allemand'=>'🇩🇪'];
+              $flag = $flagMap[mb_strtolower($langName)] ?? '🌐';
+              $ll = mb_strtolower($langLevel);
+              $bar = match(true) {
+                str_contains($ll,'maternel')||str_contains($ll,'native')||str_contains($ll,'bilingue') => '100%',
+                str_contains($ll,'courant')||str_contains($ll,'fluent')||str_contains($ll,'advanced') => '88%',
+                str_contains($ll,'interm') => '60%',
+                str_contains($ll,'debut')||str_contains($ll,'basic') => '35%',
+                default => '72%',
+              };
             ?>
             <div class="cv-lang-item">
               <div class="cv-lang-row">
-                <span class="cv-lang-name"><?= htmlspecialchars($lang) ?></span>
+                <span class="cv-lang-name"><?= $flag ?> <?= htmlspecialchars($langName) ?></span>
+                <?php if ($langLevel !== '') { ?><span style="font-size:11px;font-weight:600;color:var(--cv-muted);"><?= htmlspecialchars($langLevel) ?></span><?php } ?>
               </div>
-              <div class="cv-lang-bar"><div class="cv-lang-fill" style="width:85%;"></div></div>
+              <div class="cv-lang-bar"><div class="cv-lang-fill" style="width:<?= $bar ?>;"></div></div>
             </div>
-            <?php } } else { ?>
+            <?php }
+            if (count($languages) === 0) { ?>
             <div class="cv-contact-value" style="color:var(--cv-muted2);"><?= htmlspecialchars($emptyPh) ?></div>
             <?php } ?>
           </div>

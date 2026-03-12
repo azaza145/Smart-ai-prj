@@ -23,9 +23,13 @@ $accent = '#1a6b4a';
     <meta charset="UTF-8">
     <title>CV — <?= htmlspecialchars($name) ?></title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: DejaVu Sans, sans-serif; font-size: 10px; line-height: 1.4; color: #1c1a17; }
+        @page { margin: 15mm 12mm; }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 11px; line-height: 1.4; color: #1c1a17; }
         table { width: 100%; border-collapse: collapse; }
+        td, th { word-break: break-word; }
+        h2, h3, .cv-section-title { page-break-after: avoid; }
+        .cv-item { page-break-inside: avoid; }
         .sidebar { width: 28%; background: <?= $accent ?>; color: #fff; padding: 24px 18px; vertical-align: top; }
         .main { width: 72%; padding: 28px 32px; vertical-align: top; background: #fff; }
         .sb-avatar { width: 64px; height: 64px; border-radius: 50%; background: rgba(255,255,255,0.25); text-align: center; line-height: 64px; font-size: 22px; font-weight: bold; margin: 0 auto 12px; border: 2px solid rgba(255,255,255,0.4); }
@@ -35,13 +39,14 @@ $accent = '#1a6b4a';
         .sb-section-title { font-size: 8px; font-weight: bold; letter-spacing: 1.2px; text-transform: uppercase; opacity: 0.7; margin-bottom: 6px; }
         .sb-contact-item { font-size: 9px; margin-bottom: 5px; opacity: 0.95; }
         .sb-skill-row { margin-bottom: 6px; }
-        .sb-skill-name { font-size: 9px; display: inline-block; width: 60%; }
-        .sb-skill-bar { display: inline-block; width: 35%; height: 3px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden; vertical-align: middle; }
-        .sb-skill-fill { height: 100%; background: rgba(255,255,255,0.8); border-radius: 2px; }
+        .sb-skill-name { font-size: 9px; margin-bottom: 2px; }
+        .sb-skill-bar-wrap { width: 100%; height: 5px; background: rgba(255,255,255,0.25); border-radius: 3px; overflow: hidden; }
+        .sb-skill-bar-fill { height: 5px; background: rgba(255,255,255,0.9); border-radius: 3px; }
         .sb-lang-item { font-size: 9px; margin-bottom: 4px; }
         .cv-name-main { font-size: 22px; font-weight: bold; color: #1c1a17; margin-bottom: 4px; }
         .cv-role-main { font-size: 11px; color: <?= $accent ?>; font-weight: 600; margin-bottom: 18px; }
-        .cv-section { margin-bottom: 16px; }
+        .cv-section { margin-bottom: 14px; }
+        .cv-section:last-child { margin-bottom: 0; }
         .cv-section-title { font-size: 9px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; color: <?= $accent ?>; border-bottom: 2px solid <?= $accent ?>; padding-bottom: 5px; margin-bottom: 10px; }
         .cv-item { margin-bottom: 10px; padding-left: 10px; border-left: 2px solid #e0e0e0; }
         .cv-item-title { font-weight: bold; font-size: 11px; color: #1c1a17; }
@@ -67,8 +72,8 @@ $accent = '#1a6b4a';
     <?php if (count($skills) > 0) { ?>
     <div class="sb-divider"></div>
     <div class="sb-section-title">COMPÉTENCES</div>
-    <?php foreach (array_slice($skills, 0, 8) as $i => $s) { $w = max(40, 85 - $i * 8); ?>
-    <div class="sb-skill-row"><span class="sb-skill-name"><?= htmlspecialchars($s) ?></span><span class="sb-skill-bar"><span class="sb-skill-fill" style="width:<?= $w ?>%;"></span></span></div>
+    <?php foreach (array_slice($skills, 0, 8) as $i => $s) { $w = (int) max(70, 92 - $i * 4); ?>
+    <div class="sb-skill-row"><div class="sb-skill-name"><?= htmlspecialchars($s) ?></div><div class="sb-skill-bar-wrap"><div class="sb-skill-bar-fill" style="width:<?= $w ?>%;"></div></div></div>
     <?php } ?>
     <?php } ?>
     <?php if (count($langs) > 0) { ?>
@@ -77,9 +82,16 @@ $accent = '#1a6b4a';
     <?php foreach (array_slice($langs, 0, 5) as $l) { ?><div class="sb-lang-item"><?= htmlspecialchars($l) ?></div><?php } ?>
     <?php } ?>
 </td>
-<td class="main">
-    <div class="cv-name-main"><?= htmlspecialchars($name) ?></div>
-    <div class="cv-role-main"><?= htmlspecialchars($roleLine) ?></div>
+<td class="main" style="vertical-align: top;">
+    <?php
+    $summary = \App\Services\CandidateProfileSchema::displayValue($profile['summary'] ?? null);
+    $hasSummary = $summary !== \App\Services\CandidateProfileSchema::EMPTY_PLACEHOLDER && trim((string)$summary) !== '';
+    if ($hasSummary) { ?>
+    <div class="cv-section" style="margin-top:0;">
+        <div class="cv-section-title">À PROPOS</div>
+        <div class="cv-item-desc" style="padding-left:0;border-left:none;"><?= nl2br(htmlspecialchars($summary)) ?></div>
+    </div>
+    <?php } ?>
 
     <?php if (count($profile['experience'] ?? []) > 0) { ?>
     <div class="cv-section">

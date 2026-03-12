@@ -33,6 +33,18 @@ final class CvTextNormalizer
         $lines = array_filter($lines, static function ($l) {
             return $l !== '';
         });
+        // Inject double newline before ALL-CAPS section headers so LLM sees boundaries
+        $text = implode("\n", $lines);
+        $text = preg_replace(
+            '/(?<!\n)\n([A-ZÀÂÉÈÊËÎÏÔÙÛÜ][A-ZÀÂÉÈÊËÎÏÔÙÛÜ\s\-&\/]{3,})\n/u',
+            "\n\n$1\n",
+            "\n" . $text
+        );
+        // Preserve bullet/dash lines as individual lines (not collapsed)
+        $lines = array_values(array_filter(
+            array_map('trim', explode("\n", $text)),
+            static fn ($l) => $l !== ''
+        ));
         return implode("\n", $lines);
     }
 }

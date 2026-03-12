@@ -12,15 +12,38 @@ class Recommendation
         $pdo->beginTransaction();
         try {
             $pdo->prepare("DELETE FROM recommendations WHERE job_id = ?")->execute([$jobId]);
-            $stmt = $pdo->prepare("INSERT INTO recommendations (job_id, candidate_id, score, ranking) VALUES (?, ?, ?, ?)");
+            $useExtended = !empty($ranked) && array_key_exists('score_pct', $ranked[0]);
             $ranking = 1;
             foreach ($ranked as $row) {
-                $stmt->execute([
-                    $jobId,
-                    $row['candidate_id'],
-                    $row['score'],
-                    $ranking++,
-                ]);
+                if ($useExtended) {
+                    try {
+                        $breakdown = isset($row['score_tfidf']) ? json_encode([
+                            'tfidf' => $row['score_tfidf'] ?? null,
+                            'skills' => $row['score_skills'] ?? null,
+                            'exp' => $row['score_exp'] ?? null,
+                        ]) : null;
+                        $stmt = $pdo->prepare("INSERT INTO recommendations (job_id, candidate_id, score, score_pct, score_breakdown, ranking) VALUES (?, ?, ?, ?, ?, ?)");
+                        $stmt->execute([
+                            $jobId,
+                            $row['candidate_id'],
+                            $row['score'],
+                            $row['score_pct'] ?? null,
+                            $breakdown,
+                            $ranking++,
+                        ]);
+                    } catch (\PDOException $e) {
+                        if (strpos($e->getMessage(), 'Unknown column') !== false || strpos($e->getMessage(), 'score_pct') !== false) {
+                            $useExtended = false;
+                            $stmt = $pdo->prepare("INSERT INTO recommendations (job_id, candidate_id, score, ranking) VALUES (?, ?, ?, ?)");
+                            $stmt->execute([$jobId, $row['candidate_id'], $row['score'], $ranking++]);
+                        } else {
+                            throw $e;
+                        }
+                    }
+                } else {
+                    $stmt = $pdo->prepare("INSERT INTO recommendations (job_id, candidate_id, score, ranking) VALUES (?, ?, ?, ?)");
+                    $stmt->execute([$jobId, $row['candidate_id'], $row['score'], $ranking++]);
+                }
             }
             $pdo->commit();
         } catch (\Throwable $e) {
@@ -39,8 +62,12 @@ class Recommendation
             $params[] = $filters['ville'];
         }
         if (isset($filters['min_score'])) {
+            $min = (float) $filters['min_score'];
+            if ($min > 1) {
+                $min = $min / 100; // User entered 0-100
+            }
             $where[] = "r.score >= ?";
-            $params[] = $filters['min_score'];
+            $params[] = $min;
         }
         if (isset($filters['experience_min'])) {
             $where[] = "c.experience_annees >= ?";

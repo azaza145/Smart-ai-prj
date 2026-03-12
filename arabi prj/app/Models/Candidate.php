@@ -497,8 +497,17 @@ class Candidate
         return $cache;
     }
 
+    /** Inscription : lie un candidat existant (même email) au user ou en crée un nouveau. */
     public static function createFromRegistration(int $userId, array $data): int
     {
+        $email = trim($data['email'] ?? '');
+        $existing = $email !== '' ? self::findByEmail($email) : null;
+        if ($existing) {
+            $pdo = DB::getInstance();
+            $pdo->prepare("UPDATE candidates SET user_id = ?, prenom = COALESCE(NULLIF(TRIM(prenom), ''), ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                ->execute([$userId, $data['prenom'] ?? $data['name'] ?? '', $existing['id']]);
+            return (int) $existing['id'];
+        }
         $pdo = DB::getInstance();
         $stmt = $pdo->prepare("INSERT INTO candidates (user_id, nom, prenom, email, telephone, age, ville, experience_annees, poste_actuel, entreprise_actuelle, education_niveau, diplome, universite, annee_diplome, competences_techniques_raw, competences_langues_raw, langues_niveau_raw, experience_detail_raw, projets_raw, certifications_raw, disponibilite, pretention_salaire) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
         $stmt->execute([

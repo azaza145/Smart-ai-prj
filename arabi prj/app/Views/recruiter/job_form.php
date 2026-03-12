@@ -35,12 +35,13 @@ $skillsList = array_values(array_filter(array_map('trim', preg_split('/[\s,;|\/]
                     <?php } ?>
                 </div>
                 <div class="field ff">
-                    <label>Compétences recherchées</label>
+                    <label>Compétences recherchées <span style="color:var(--muted);">(séparées par virgules)</span></label>
                     <div class="skills-wrap job-skills-wrap" id="job-skills-wrap" onclick="document.getElementById('job-skills-input').focus()">
                         <?php foreach ($skillsList as $s) { ?><span class="sk-tag job-sk-tag"><?= htmlspecialchars($s) ?><span class="rm" onclick="removeJobSkill(this, event)" role="button" aria-label="Retirer">×</span></span><?php } ?>
                         <input type="text" class="sk-input" id="job-skills-input" placeholder="Ajouter une compétence, Entrée pour valider" autocomplete="off"/>
                     </div>
                     <input type="hidden" name="skills_raw" id="job-skills-raw" value="<?= htmlspecialchars($skillsVal) ?>">
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;">Ces compétences sont utilisées par le moteur IA pour le matching candidats.</div>
                 </div>
                 <div class="field ff"><label>Description (optionnel)</label><textarea name="description" rows="2" placeholder="Missions, contexte…"><?= htmlspecialchars($job ? ($job['description'] ?? '') : '') ?></textarea></div>
                 <div class="field ff"><label>Profil recherché / Exigences (optionnel)</label><textarea name="requirements" rows="2" placeholder="Compétences, expérience…"><?= htmlspecialchars($job ? ($job['requirements'] ?? '') : '') ?></textarea></div>

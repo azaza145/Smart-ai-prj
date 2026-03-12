@@ -23,6 +23,26 @@ class CandidateController
         }
         $profile = $candidate ? CandidateProfile::get($candidate['id']) : null;
         $cvs = $candidate ? Cv::findByCandidate($candidate['id']) : [];
+        // Réattribuer les CV d'un autre candidat (même email, ex. import CSV) au candidat connecté
+        if ($candidate && empty($cvs)) {
+            $email = trim($candidate['email'] ?? '');
+            if ($email !== '') {
+                $pdo = \App\Core\DB::getInstance();
+                $stmt = $pdo->prepare("SELECT id, user_id FROM candidates WHERE LOWER(TRIM(email)) = LOWER(?) AND id != ?");
+                $stmt->execute([$email, $candidate['id']]);
+                while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+                    $otherId = (int) $row['id'];
+                    $otherUserId = isset($row['user_id']) ? (int) $row['user_id'] : null;
+                    if ($otherUserId === null || $otherUserId === (int) $user['id']) {
+                        $reassigned = Cv::reassignToCandidate($otherId, $candidate['id']);
+                        if ($reassigned > 0) {
+                            $cvs = Cv::findByCandidate($candidate['id']);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         try {
             $documents = $candidate ? CandidateDocument::findByCandidate($candidate['id']) : [];
         } catch (\Throwable $e) {
@@ -228,22 +248,38 @@ class CandidateController
         $relativePath = 'storage/cv/' . $filename;
         $cvId = Cv::create($candidate['id'], $relativePath, $_FILES['cv']['name'], null);
 
-        // Extract text via Python (OCR), then parse in Python to fill empty profile fields (CV → champs)
+        // Extraction texte + pré-remplissage automatique (formation, expériences, compétences)
         $filled = [];
+        $text = null;
+        $result = [];
         $pythonPath = dirname(__DIR__, 2) . '/' . $relativePath;
         if (is_file(dirname(__DIR__, 2) . '/python/extract_pdf_text.py')) {
             try {
                 $runner = new \App\Services\PythonRunner();
                 $result = $runner->runExtractPdf($pythonPath);
                 if (!empty($result['text'])) {
-                    Cv::updateExtractedText($cvId, $result['text']);
-                }
-                $parsedData = array_merge($result['structured'] ?? [], $result['parsed'] ?? []);
-                if (!empty($parsedData)) {
-                    $filled = Candidate::mergeParsedIntoProfile($candidate['id'], $parsedData);
+                    $text = $result['text'];
+                    Cv::updateExtractedText($cvId, $text);
                 }
             } catch (\Throwable $e) {
-                // ignore extraction failure
+                // ignore
+            }
+        }
+        // Ollama extraction si activé (meilleure qualité)
+        $useOllama = !empty($_ENV['OLLAMA_CV_ENABLED']) && ($_ENV['OLLAMA_CV_ENABLED'] === '1' || $_ENV['OLLAMA_CV_ENABLED'] === 'true');
+        if ($useOllama && $text) {
+            try {
+                $extractor = new \App\Services\Ollama\CvExtractionService();
+                $canonicalProfile = $extractor->extractFromText($text);
+                $filled = Candidate::applyCanonicalProfile($candidate['id'], $canonicalProfile, false);
+            } catch (\Throwable $e) {
+                // fallback Python parsed
+            }
+        }
+        if (empty($filled) && !empty($result)) {
+            $parsedData = array_merge($result['structured'] ?? [], $result['parsed'] ?? []);
+            if (!empty($parsedData)) {
+                $filled = Candidate::mergeParsedIntoProfile($candidate['id'], $parsedData);
             }
         }
         if (!empty($filled)) {
@@ -251,6 +287,69 @@ class CandidateController
         } else {
             $this->flash('CV téléchargé avec succès!', 'success');
         }
+        header('Location: /candidate/profile');
+        exit;
+    }
+
+    /** Candidat consulte son propre CV (PDF inline dans l'onglet). */
+    public function viewOwnCv(int $cvId): void
+    {
+        $user = Auth::user();
+        $candidate = Candidate::findByUserId($user['id']);
+        if (!$candidate) {
+            $this->redirect404();
+            return;
+        }
+        $pdo = \App\Core\DB::getInstance();
+        $stmt = $pdo->prepare("SELECT * FROM cvs WHERE id = ? AND candidate_id = ?");
+        $stmt->execute([$cvId, $candidate['id']]);
+        $cv = $stmt->fetch();
+        if (!$cv) {
+            $this->redirect404();
+            return;
+        }
+        $basePath = dirname(__DIR__, 2);
+        $fullPath = Cv::resolveFullPath($basePath, $cv['file_path'] ?? '');
+        if (!$fullPath) {
+            $this->flash('Fichier CV introuvable.', 'danger');
+            header('Location: /candidate/profile');
+            exit;
+        }
+        $name = $cv['original_name'] ?: 'CV_' . $candidate['prenom'] . '_' . $candidate['nom'] . '.pdf';
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . preg_replace('/[^\w\s\-\.]/', '_', $name) . '"');
+        header('Content-Length: ' . filesize($fullPath));
+        readfile($fullPath);
+        exit;
+    }
+
+    /** Supprimer un CV PDF déposé. */
+    public function deleteCv(int $cvId): void
+    {
+        if (!Csrf::verify()) {
+            $this->flash('Requête invalide.', 'danger');
+            header('Location: /candidate/profile');
+            exit;
+        }
+        $user = Auth::user();
+        $candidate = Candidate::findByUserId($user['id']);
+        if (!$candidate) {
+            $this->redirect404();
+            return;
+        }
+        $cv = Cv::findByIdAndCandidate($cvId, (int) $candidate['id']);
+        if (!$cv) {
+            $this->flash('CV introuvable.', 'danger');
+            header('Location: /candidate/profile');
+            exit;
+        }
+        $basePath = dirname(__DIR__, 2);
+        $fullPath = Cv::resolveFullPath($basePath, $cv['file_path'] ?? '');
+        if ($fullPath && is_file($fullPath)) {
+            @unlink($fullPath);
+        }
+        Cv::delete($cvId);
+        $this->flash('CV supprimé.', 'success');
         header('Location: /candidate/profile');
         exit;
     }

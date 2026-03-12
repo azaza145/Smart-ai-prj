@@ -58,6 +58,7 @@ if (strlen($avatarInit) < 2) $avatarInit = strtoupper($avatarInit ?: 'U') . 'X';
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link href="/css/recruteia.css?v=<?= time() ?>" rel="stylesheet">
     <?php if ($layoutRole === 'candidate') { ?><link href="/css/candidate-profile.css" rel="stylesheet"><?php } ?>
+    <?php if (!empty($extraCss)) { ?><link href="<?= htmlspecialchars($extraCss) ?>" rel="stylesheet"><?php } ?>
 </head>
 <body class="app-layout">
 

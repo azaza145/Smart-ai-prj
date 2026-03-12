@@ -67,12 +67,15 @@ $router->get('/recruiter/jobs/{id}/results', [\App\Controllers\RecruiterControll
 $router->get('/recruiter/jobs/{id}', [\App\Controllers\RecruiterController::class, 'showJob'], [Middleware::auth(), Middleware::recruiter()]);
 $router->get('/recruiter/jobs/{jobId}/candidates/{candidateId}', [\App\Controllers\RecruiterController::class, 'candidateDetail'], [Middleware::auth(), Middleware::recruiter()]);
 $router->get('/recruiter/candidates/{id}/cv-pdf', [\App\Controllers\RecruiterController::class, 'downloadCandidateCvPdf'], [Middleware::auth(), Middleware::recruiter()]);
+$router->get('/recruiter/candidates/{id}/cv-profil', [\App\Controllers\RecruiterController::class, 'viewCandidateCvProfil'], [Middleware::auth(), Middleware::recruiter()]);
 $router->post('/recruiter/candidates/{id}/fill-from-cv', [\App\Controllers\RecruiterController::class, 'fillCandidateFromCv'], [Middleware::auth(), Middleware::recruiter()]);
 
 // Candidate
 $router->get('/candidate/profile', [\App\Controllers\CandidateController::class, 'profile'], [Middleware::auth(), Middleware::candidate()]);
 $router->post('/candidate/profile', [\App\Controllers\CandidateController::class, 'profile'], [Middleware::auth(), Middleware::candidate()]);
 $router->post('/candidate/upload-cv', [\App\Controllers\CandidateController::class, 'uploadCv'], [Middleware::auth(), Middleware::candidate()]);
+$router->get('/candidate/profile/cv/{cvId}', [\App\Controllers\CandidateController::class, 'viewOwnCv'], [Middleware::auth(), Middleware::candidate()]);
+$router->post('/candidate/profile/cv/{cvId}/delete', [\App\Controllers\CandidateController::class, 'deleteCv'], [Middleware::auth(), Middleware::candidate()]);
 $router->post('/candidate/upload-document', [\App\Controllers\CandidateController::class, 'uploadDocument'], [Middleware::auth(), Middleware::candidate()]);
 $router->get('/candidate/profile/documents/{id}/download', [\App\Controllers\CandidateController::class, 'downloadDocument'], [Middleware::auth(), Middleware::candidate()]);
 $router->post('/candidate/profile/documents/{id}/delete', [\App\Controllers\CandidateController::class, 'deleteDocument'], [Middleware::auth(), Middleware::candidate()]);

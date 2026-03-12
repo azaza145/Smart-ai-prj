@@ -3,12 +3,13 @@
 Extract text from PDF and map to structured JSON schema.
 
 Pipeline:
-  1. Extract text from PDF: PyMuPDF -> pdfplumber -> pdfminer -> pypdf
-  2. Detect sections (FORMATION, EXPÉRIENCE, COMPÉTENCES, LANGUES, etc.)
-  3. Regex for easy fields: email, phone, LinkedIn, dates
-  4. Rule-based parse: education, experience, skills (keywords)
-  5. Optional AI/NLP (LLM): job title, summary, education/experience entries, skills
-  6. Normalize into JSON: { "text", "source", "structured", "parsed" }
+  1. Extract text from PDF: PyMuPDF -> pdfplumber -> pdfminer -> pypdf -> OCR
+  2. Text quality check: try next extractor if result is empty or garbled
+  3. Detect sections (FORMATION, EXPÉRIENCE, COMPÉTENCES, LANGUES, etc.)
+  4. Regex for easy fields: email, phone, LinkedIn, dates
+  5. Rule-based parse: education, experience, skills (keywords)
+  6. Optional AI/NLP (LLM): job title, summary, education/experience entries, skills
+  7. Normalize into JSON: { "text", "source", "structured", "parsed" }
 
   - structured: full schema (personal_info, experience, education, skills, languages, hobbies)
   - parsed: flat dict for PHP Candidate::fillEmptyFromParsedCv
@@ -38,8 +39,23 @@ except ImportError:
     merge_structured = None
 
 
+def is_valid_text(text: str) -> bool:
+    """Check if extracted text has meaningful content."""
+    text = text.strip()
+    if len(text) < 100:
+        return False
+    words = text.split()
+    if len(words) < 10:
+        return False
+    # Check for garbled text (high ratio of non-alphanumeric chars)
+    alpha_count = sum(1 for c in text if c.isalpha())
+    if alpha_count / max(len(text), 1) < 0.3:
+        return False
+    return True
+
+
 def extract_text_pymupdf(path: str) -> str:
-    """Direct text extraction via PyMuPDF (fitz). Fast and clean for text PDFs."""
+    """Direct text extraction via PyMuPDF (fitz). Fast and clean for text PDFs. Handles multi-column."""
     try:
         import fitz
     except ImportError:
@@ -48,9 +64,13 @@ def extract_text_pymupdf(path: str) -> str:
         doc = fitz.open(path)
         parts = []
         for page in doc:
-            parts.append(page.get_text())
+            # sort=True gives reading-order text (handles columns)
+            text = page.get_text("text", sort=True)
+            if text:
+                parts.append(text.strip())
         doc.close()
-        return "\n\n".join(parts).strip()
+        result = "\n\n".join(parts).strip()
+        return result if is_valid_text(result) else ""
     except Exception:
         return ""
 
@@ -68,7 +88,8 @@ def extract_text_pdfplumber(path: str) -> str:
                 t = page.extract_text()
                 if t:
                     parts.append(t)
-        return "\n\n".join(parts).strip()
+        result = "\n\n".join(parts).strip()
+        return result if is_valid_text(result) else ""
     except Exception:
         return ""
 
@@ -77,7 +98,8 @@ def extract_text_pdfminer(path: str) -> str:
     """Fallback: pdfminer.six."""
     try:
         from pdfminer.high_level import extract_text as pdfminer_extract
-        return (pdfminer_extract(path) or "").strip()
+        result = (pdfminer_extract(path) or "").strip()
+        return result if is_valid_text(result) else ""
     except ImportError:
         pass
     except Exception:
@@ -90,12 +112,30 @@ def extract_text_pypdf(path: str) -> str:
     try:
         from pypdf import PdfReader
         reader = PdfReader(path)
-        return "\n".join((p.extract_text() or "" for p in reader.pages)).strip()
+        result = "\n".join((p.extract_text() or "" for p in reader.pages)).strip()
+        return result if is_valid_text(result) else ""
     except ImportError:
         pass
     except Exception:
         pass
     return ""
+
+
+def extract_text_ocr_fallback(path: str) -> str:
+    """OCR fallback for image-only/scanned PDFs using pytesseract + pdf2image."""
+    try:
+        from pdf2image import convert_from_path
+        import pytesseract
+        pages = convert_from_path(path, dpi=200)
+        texts = []
+        for page_img in pages:
+            text = pytesseract.image_to_string(page_img, lang='fra+eng')
+            if text.strip():
+                texts.append(text.strip())
+        result = "\n\n".join(texts).strip()
+        return result if is_valid_text(result) else ""
+    except Exception:
+        return ""
 
 
 def main():
@@ -106,22 +146,23 @@ def main():
     source = "none"
     text = ""
 
+    extractors = [
+        ("pymupdf", extract_text_pymupdf),
+        ("pdfplumber", extract_text_pdfplumber),
+        ("pdfminer", extract_text_pdfminer),
+        ("pypdf", extract_text_pypdf),
+        ("ocr", extract_text_ocr_fallback),
+    ]
+
     try:
-        text = extract_text_pymupdf(path)
-        if text:
-            source = "pymupdf"
-        if not text:
-            text = extract_text_pdfplumber(path)
-            if text:
-                source = "pdfplumber"
-        if not text:
-            text = extract_text_pdfminer(path)
-            if text:
-                source = "pdfminer"
-        if not text:
-            text = extract_text_pypdf(path)
-            if text:
-                source = "pypdf"
+        for src_name, extractor in extractors:
+            try:
+                text = extractor(path)
+                if text and is_valid_text(text):
+                    source = src_name
+                    break
+            except Exception:
+                continue
 
         text = (text or "").strip()
         out = {"text": text or "", "source": source}

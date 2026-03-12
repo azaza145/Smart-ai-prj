@@ -391,8 +391,8 @@ class RecruiterController
             return;
         }
         $basePath = dirname(__DIR__, 2);
-        $fullPath = $basePath . '/' . $cv['file_path'];
-        if (!is_file($fullPath)) {
+        $fullPath = \App\Models\Cv::resolveFullPath($basePath, $cv['file_path'] ?? '');
+        if (!$fullPath) {
             $this->flash('Fichier CV introuvable.', 'danger');
             header('Location: /recruiter/candidates/' . $id);
             exit;
@@ -421,8 +421,8 @@ class RecruiterController
             return;
         }
         $basePath = dirname(__DIR__, 2);
-        $fullPath = $basePath . '/' . $cv['file_path'];
-        if (!is_file($fullPath)) {
+        $fullPath = \App\Models\Cv::resolveFullPath($basePath, $cv['file_path'] ?? '');
+        if (!$fullPath) {
             $this->redirect404();
             return;
         }
@@ -545,6 +545,29 @@ class RecruiterController
         }
         $cvs = \App\Models\Cv::findByCandidate($candidateId);
         $latestCv = \App\Models\Cv::getLatest($candidateId);
+        $cvExtractedText = $latestCv['extracted_text'] ?? null;
+        // Only extract if no extracted text exists, CV file exists, and not tried recently
+        if (($cvExtractedText === null || $cvExtractedText === '') && !empty($cvs) && $latestCv && !empty($latestCv['file_path'])) {
+            $lastAttempt = $latestCv['extraction_attempted_at'] ?? null;
+            $shouldRetry = !$lastAttempt || (time() - strtotime($lastAttempt)) > 3600;
+            if ($shouldRetry) {
+                $projectRoot = dirname(__DIR__, 2);
+                $fullPath = $projectRoot . '/' . $latestCv['file_path'];
+                if (is_file($fullPath) && is_readable($fullPath)) {
+                    try {
+                        \App\Models\Cv::markExtractionAttempted((int) $latestCv['id']);
+                        $runner = new \App\Services\PythonRunner();
+                        $result = $runner->runExtractPdf($fullPath);
+                        if (!empty($result['text'])) {
+                            \App\Models\Cv::updateExtractedText((int) $latestCv['id'], $result['text']);
+                            $cvExtractedText = $result['text'];
+                        }
+                    } catch (\Throwable $e) {
+                        error_log('CV extraction failed for candidate ' . $candidateId . ': ' . $e->getMessage());
+                    }
+                }
+            }
+        }
         $profile = Candidate::getProfile($candidateId);
         $rec = null;
         $pdo = \App\Core\DB::getInstance();
@@ -552,6 +575,7 @@ class RecruiterController
         $stmt->execute([$jobId, $candidateId]);
         $rec = $stmt->fetch();
         $application = Application::findByJobAndCandidate($jobId, $candidateId);
+        $applications = Application::findByCandidate($candidateId);
         $this->layout('recruiter/candidate_detail', [
             'title' => 'Candidate - ' . $candidate['prenom'] . ' ' . $candidate['nom'],
             'job' => $job,
@@ -561,10 +585,26 @@ class RecruiterController
             'latestCv' => $latestCv,
             'recommendation' => $rec,
             'application' => $application,
+            'applications' => $applications,
         ]);
     }
 
-    /** Télécharger le CV original uploadé (pas de génération). */
+    /** Afficher le CV généré à partir du profil (modèle vert/blanc) — pour iframe quand aucun PDF déposé. */
+    public function viewCandidateCvProfil(int $id): void
+    {
+        $candidate = Candidate::find($id);
+        if (!$candidate) {
+            $this->redirect404();
+            return;
+        }
+        $profile = Candidate::getProfile($id);
+        $profile = \App\Services\CandidateProfileSchema::normalizeCandidateProfile($profile);
+        header('Content-Type: text/html; charset=UTF-8');
+        echo $this->renderCvPdfHtmlFromProfile($profile);
+        exit;
+    }
+
+    /** Télécharger le CV : PDF uploadé si présent, sinon CV généré à partir du profil. */
     public function downloadCandidateCvPdf(int $id): void
     {
         $candidate = Candidate::find($id);
@@ -573,24 +613,29 @@ class RecruiterController
             return;
         }
         $latestCv = \App\Models\Cv::getLatest($id);
-        if (!$latestCv || empty($latestCv['file_path'])) {
-            $this->flash('Aucun CV trouvé pour ce candidat.', 'danger');
-            header('Location: /recruiter/candidates/' . $id);
-            exit;
-        }
         $basePath = dirname(__DIR__, 2);
-        $fullPath = $basePath . '/' . $latestCv['file_path'];
-        if (!is_file($fullPath)) {
-            $this->flash('Fichier CV introuvable.', 'danger');
-            header('Location: /recruiter/candidates/' . $id);
+        $fullPath = null;
+        if ($latestCv && !empty($latestCv['file_path'])) {
+            $fullPath = \App\Models\Cv::resolveFullPath($basePath, $latestCv['file_path'] ?? '');
+        }
+        if ($fullPath && is_file($fullPath)) {
+            $name = $latestCv['original_name'] ?: 'CV_' . $candidate['prenom'] . '_' . $candidate['nom'] . '.pdf';
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: attachment; filename="' . preg_replace('/[^\w\s\-\.]/', '_', $name) . '"');
+            header('Content-Length: ' . filesize($fullPath));
+            readfile($fullPath);
             exit;
         }
-        $name = $latestCv['original_name'] ?: 'CV_' . $candidate['prenom'] . '_' . $candidate['nom'] . '.pdf';
-        header('Content-Type: application/pdf');
-        header('Content-Disposition: attachment; filename="' . preg_replace('/[^\w\s\-\.]/', '_', $name) . '"');
-        header('Content-Length: ' . filesize($fullPath));
-        readfile($fullPath);
-        exit;
+        $profile = Candidate::getProfile($id);
+        $profile = \App\Services\CandidateProfileSchema::normalizeCandidateProfile($profile);
+        $html = $this->renderCvPdfHtmlFromProfile($profile);
+        $filename = 'CV_' . preg_replace('/[^\w\s\-\.]/', '_', trim($candidate['prenom'] . ' ' . $candidate['nom'])) . '.pdf';
+        if (!class_exists(\Dompdf\Dompdf::class)) {
+            $this->flash('Export PDF indisponible. Affichage du CV en page.', 'info');
+            header('Location: /recruiter/candidates/' . $id . '/cv-profil');
+            exit;
+        }
+        $this->outputPdf($html, $filename);
     }
 
     /** Pré-remplir le profil à partir du CV : ré-extraction du PDF (avec fallback OCR) puis parsing → champs. */
